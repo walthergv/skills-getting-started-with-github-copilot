@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 4500);
   }
 
-  function createParticipantItem(email) {
+  function createParticipantItem(email, activityName) {
     const li = document.createElement("li");
     const initials = email.charAt(0).toUpperCase();
     const badge = document.createElement("span");
@@ -25,6 +25,45 @@ document.addEventListener("DOMContentLoaded", () => {
     const span = document.createElement("span");
     span.textContent = email;
     li.appendChild(span);
+
+    // Remove button
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "participant-remove-button";
+    btn.title = "Unregister";
+    btn.setAttribute("aria-label", `Unregister ${email}`);
+    btn.textContent = "🗑️";
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      try {
+        const url = `/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`;
+        const res = await fetch(url, { method: "DELETE" });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Error al remover participante");
+        }
+
+        // Update local state
+        if (activities[activityName]) {
+          activities[activityName].participants = activities[activityName].participants.filter((p) => p !== email);
+          const card = document.querySelector(`.activity-card[data-activity="${CSS.escape(activityName)}"]`);
+          if (card) {
+            const capacityP = card.querySelector("p:nth-of-type(3)");
+            if (capacityP) {
+              capacityP.innerHTML = `<strong>Capacidad:</strong> ${activities[activityName].participants.length} / ${activities[activityName].max_participants}`;
+            }
+          }
+        }
+
+        li.remove();
+        showMessage(`Se ha eliminado ${email}`, "info");
+      } catch (err) {
+        console.error(err);
+        showMessage(err.message || "No se pudo eliminar", "error");
+      }
+    });
+
+    li.appendChild(btn);
     return li;
   }
 
@@ -67,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const ul = document.createElement("ul");
       ul.className = "participants-list";
       info.participants.forEach((email) => {
-        ul.appendChild(createParticipantItem(email));
+        ul.appendChild(createParticipantItem(email, name));
       });
 
       participantsSection.appendChild(ul);
@@ -127,7 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           const ul = card.querySelector(".participants-list");
           if (ul) {
-            ul.appendChild(createParticipantItem(email));
+            ul.appendChild(createParticipantItem(email, activityName));
           }
         }
       }
